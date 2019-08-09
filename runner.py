@@ -1,12 +1,12 @@
-import logger
+from utils import logger
 import multiprocessing as mp
 import numpy as np
 
-from parser import parse_args
-from utils import set_global_seeds
+from utils.parser import parse_args
+from utils.misc import set_global_seeds
 from model import BinaryClassifier
-from dataloader import UCIDataLoader, make_noisy_data
-from results_plotter import plot
+from utils.dataloader import UCIDataLoader, make_noisy_data
+from utils.results_plotter import plot
 
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression

@@ -6,12 +6,14 @@ from sklearn.utils import shuffle
 
 
 class MLP(nn.Module):
-    def __init__(self, feature_dim, hidsize):
+    def __init__(self, feature_dim, hidsize, dropout):
         super(MLP, self).__init__()
         self.mlp = nn.Sequential(
             nn.Linear(feature_dim, hidsize),
+            nn.Dropout(dropout),
             nn.ReLU(),
             nn.Linear(hidsize, hidsize),
+            nn.Dropout(dropout),
             nn.ReLU(),
             nn.Linear(hidsize, 1)
         )
@@ -32,16 +34,18 @@ class MLP(nn.Module):
 
 
 class BinaryClassifier:
-    def __init__(self, feature_dim, lr, hidsize):
-        self.mlp = MLP(feature_dim, hidsize)
+    def __init__(self, feature_dim, lr, hidsize, dropout):
+        self.mlp = MLP(feature_dim, hidsize, dropout)
         self.criterion = torch.nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.Adam(self.mlp.parameters(), lr)
 
     def predict(self, X):
+        self.mlp.eval()
         with torch.no_grad():
             return torch.sigmoid(self.mlp(X)).cpu().numpy().round()
 
     def train(self, X, y, X_=None, y_=None):
+        self.mlp.train()
         y_pred = self.mlp(X)
         y = torch.tensor(y, dtype=torch.float)
         loss = self.criterion(y_pred, y)
@@ -71,11 +75,11 @@ class BinaryClassifier:
                 mb_X_train = X_train[i:j]
                 mb_y_train = y_train[i:j]
                 if peer_loss:
-                    random_idxes = np.random.choice(m, batchsize)
-                    mb_X_train_ = X_train[random_idxes]
-                    mb_y_train_ = y_train[random_idxes]
+                    mb_X_train_ = X_train[np.random.choice(m, batchsize)]
+                    mb_y_train_ = y_train[np.random.choice(m, batchsize)]
                     loss = self.train(mb_X_train, mb_y_train, mb_X_train_, mb_y_train_)
-                loss = self.train(mb_X_train, mb_y_train)
+                else:
+                    loss = self.train(mb_X_train, mb_y_train)
 
             train_acc.append(self.test(X_train, y_train))
             if X_test is not None and y_test is not None:

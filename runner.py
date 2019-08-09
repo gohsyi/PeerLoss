@@ -1,8 +1,9 @@
 import logger
 import multiprocessing as mp
+import numpy as np
 
 from parser import parse_args
-from utils import *
+from utils import set_global_seeds
 from model import BinaryClassifier
 from dataloader import UCIDataLoader, make_noisy_data
 from results_plotter import plot
@@ -17,9 +18,14 @@ def train(kargs):
     set_global_seeds(kargs['seed'])
     dataset = UCIDataLoader(kargs['dataset'])
     dataset.equalize_prior()
-    X_train, X_test, y_train, y_test = dataset.split_and_normalize()
+    X_train, X_test, y_train, y_test = dataset.split_and_normalize(kargs['test_size'])
     y_noisy = make_noisy_data(y_train, kargs['e0'], kargs['e1'])
-    classifier = BinaryClassifier(X_train.shape[-1], kargs['lr'], kargs['hidsize'])
+    classifier = BinaryClassifier(
+        feature_dim=X_train.shape[-1],
+        lr=kargs['lr'],
+        hidsize=kargs['hidsize'],
+        dropout=kargs['dropout']
+    )
     train_acc, test_acc = classifier.fit(
         X_train, y_noisy, X_test, y_test,
         peer_loss=kargs['peer_loss'],
@@ -74,8 +80,8 @@ def run(arg_dict):
 
     plot([results_peer, results_bce], ['use peer loss', 'use bce loss'])
 
-    logger.record_tabular('nn with peer prediction', get_max_mean(results_peer))
-    logger.record_tabular('nn with bce', get_max_mean(results_bce))
+    logger.record_tabular('nn with peer prediction', get_max_mean(np.mean(results_peer, 0)))
+    logger.record_tabular('nn', get_max_mean(np.mean(results_bce, 0)))
     logger.record_tabular('svm', svm_acc)
     logger.record_tabular('logistic regression', lr_acc)
     logger.record_tabular('random forest', rf_acc)

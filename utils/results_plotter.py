@@ -64,7 +64,7 @@ def plot(results, labels):
 def main():
     args = parse_args()
     folder = f'logs/{args.log}'
-    plot(folder)
+    plot_(folder)
 
 
 if __name__ == '__main__':

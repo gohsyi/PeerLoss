@@ -23,7 +23,7 @@ class MLP(nn.Module):
             x = torch.tensor(x, dtype=torch.float)
         if x.dim() < 2:
             x = x.unsqueeze(0)
-        return self.mlp(x).squeeze()
+        return self.mlp(x).squeeze(-1)
 
     @staticmethod
     def layer_init(layer, w_scale=1.0):

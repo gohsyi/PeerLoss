@@ -12,8 +12,12 @@ class DataLoader(object):
             self.df = pd.read_csv(f'uci/heart.csv')
             self.preprocess_heart()
         elif name == 'breast':
-            self.df = pd.read_csv(f'uci/breast.csv')
+            self.df = pd.read_csv(f'uci/breast-cancer.data', header=None)
             self.preprocess_breast()
+            self.categorical()
+        elif name == 'breast2':
+            self.df = pd.read_csv(f'uci/breast.csv')
+            self.preprocess_breast2()
         elif name == 'german':
             self.df = pd.read_csv('uci/german.csv')
         elif name == 'banana':
@@ -53,6 +57,10 @@ class DataLoader(object):
         self.df = onehot(self.df, ['cp', 'slope', 'thal', 'restecg'])
 
     def preprocess_breast(self):
+        self.df.rename(columns={0: 'target'}, inplace=True)
+        self.df.target.replace({'no-recurrence-events': 0, 'recurrence-events': 1}, inplace=True)
+
+    def preprocess_breast2(self):
         self.df.replace({'M': 1, 'B': 0}, inplace=True)
         self.df.rename(columns={'diagnosis': 'target'}, inplace=True)
         self.df.drop(['id', 'Unnamed: 32'], axis=1, inplace=True)

@@ -1,7 +1,7 @@
 import multiprocessing as mp
 import numpy as np
 
-from model import BinaryClassifier
+from model import BinaryClassifier, PeerBinaryClassifier
 from utils.parser import parse_args
 from utils.misc import set_global_seeds
 from utils.dataloader import DataLoader, make_noisy_data
@@ -29,10 +29,35 @@ def run_nn(kargs):
     )
     train_acc, test_acc = classifier.fit(
         X_train, y_noisy, X_test, y_test,
-        peer_loss=kargs['peer_loss'],
         batchsize=kargs['batchsize'],
         episodes=kargs['episodes'],
     )
+    if 'verbose' in kargs.keys():
+        plot([[train_acc], [test_acc]], ['nn during train', 'nn during test'])
+    return test_acc
+
+
+def run_nn_peer(kargs):
+    set_global_seeds(kargs['seed'])
+    dataset = DataLoader(kargs['dataset'])
+    if kargs['equalize_prior']:
+        dataset.equalize_prior()
+    X_train, X_test, y_train, y_test = dataset.train_test_split(kargs['test_size'], kargs['normalize'])
+    y_noisy = make_noisy_data(y_train, kargs['e0'], kargs['e1'])
+    classifier = PeerBinaryClassifier(
+        feature_dim=X_train.shape[-1],
+        lr=kargs['lr'],
+        hidsize=kargs['hidsize'],
+        dropout=kargs['dropout'],
+        alpha=kargs['alpha'],
+    )
+    train_acc, test_acc = classifier.fit(
+        X_train, y_noisy, X_test, y_test,
+        batchsize=kargs['batchsize'],
+        episodes=kargs['episodes'],
+    )
+    if 'verbose' in kargs.keys():
+        plot([[train_acc], [test_acc]], ['nn with peer loss during train', 'nn with peer loss during test'])
     return test_acc
 
 
@@ -98,7 +123,7 @@ def run(arg_dict):
     for seed in range(32):
         arg_dict.update({'seed': seed})
         args.append(arg_dict.copy())
-    results_peer = pool.map(run_nn, args)
+    results_peer = pool.map(run_nn_peer, args)
 
     # nn with bce loss
     args = []
@@ -148,4 +173,6 @@ def run(arg_dict):
 
 
 if __name__ == '__main__':
-    run(parse_args().__dict__)
+    args = parse_args()
+    run_nn_peer(args.__dict__)
+    run_nn(args.__dict__)

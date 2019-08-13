@@ -4,12 +4,14 @@ import argparse
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', type=str, default='heart', choices=[
-        'heart', 'breast', 'german', 'banana', 'image', 'thyroid',
+        'heart', 'breast', 'breast2', 'german', 'banana', 'image', 'thyroid',
         'titanic', 'splice', 'twonorm', 'waveform', 'flare-solar'
     ])
+    parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--e0', type=float, default=0.2)
     parser.add_argument('--e1', type=float, default=0.2)
     parser.add_argument('--lr', type=float, default=1e-3)
+    parser.add_argument('--alpha', type=float, default=1.)
     parser.add_argument('--dropout', type=float, default=0.)
     parser.add_argument('--hidsize', type=int, default=16)
     parser.add_argument('--episodes', type=int, default=100)
@@ -18,5 +20,6 @@ def parse_args():
     parser.add_argument('--equalize-prior', action='store_true', default=False)
     parser.add_argument('--peer-loss', action='store_true', default=False)
     parser.add_argument('--normalize', action='store_true', default=False)
+    parser.add_argument('--verbose', action='store_true', default=False)
     args = parser.parse_args()
     return args

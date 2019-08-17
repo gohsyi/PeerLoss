@@ -87,6 +87,12 @@ class DataLoader(object):
             self.X_test = sc.transform(self.X_test)
         return self.X_train, self.X_test, self.y_train, self.y_test
 
+    def prepare_train_test(self, kargs):
+        if kargs['equalize_prior']:
+            self.equalize_prior()
+        X_train, X_test, y_train, y_test = self.train_test_split(kargs['test_size'], kargs['normalize'])
+        y_noisy = make_noisy_data(y_train, kargs['e0'], kargs['e1'])
+        return X_train, X_test, y_noisy, y_test
 
 def onehot(df, cols):
     dummies = [pd.get_dummies(df[col]) for col in cols]

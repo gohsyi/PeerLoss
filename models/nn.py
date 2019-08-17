@@ -36,7 +36,7 @@ class MLP(nn.Module):
 class BinaryClassifier(object):
     def __init__(self, feature_dim, lr, hidsize, dropout):
         self.mlp = MLP(feature_dim, hidsize, dropout)
-        self.criterion = torch.nn.BCEWithLogitsLoss()
+        self.loss_func = torch.nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.Adam(self.mlp.parameters(), lr)
 
     def predict(self, X):
@@ -44,15 +44,11 @@ class BinaryClassifier(object):
         with torch.no_grad():
             return torch.sigmoid(self.mlp(X)).cpu().numpy().round()
 
-    def train(self, X, y, X_=None, y_=None):
+    def train(self, X, y):
         self.mlp.train()
         y_pred = self.mlp(X)
         y = torch.tensor(y, dtype=torch.float)
-        loss = self.criterion(y_pred, y)
-        if X_ is not None and y_ is not None:
-            y_pred_ = self.mlp(X_)
-            y_ = torch.tensor(y_, dtype=torch.float)
-            loss -= self.criterion(y_pred_, y_)
+        loss = self.loss_func(y_pred, y)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -83,6 +79,41 @@ class BinaryClassifier(object):
         return train_acc, test_acc
 
 
+class SurrogateBinaryClassifier(BinaryClassifier):
+    def __init__(self, feature_dim, lr, hidsize, dropout, e0, e1):
+        super(SurrogateBinaryClassifier, self).__init__(feature_dim, lr, hidsize, dropout)
+        self.loss_func = torch.nn.BCEWithLogitsLoss(reduction='none')
+        self.e = np.array([e0, e1], dtype=float)
+
+    def train(self, X, y):
+        """ The original surrogate function is:
+
+               (1 - \rho_{-y}) * l(t,y) - \rho_{y} * l(t,-y)
+        loss = ---------------------------------------------
+                        1 - \rho_{+1} - \rho_{-1}
+
+        where y \in {-1, +1},
+
+        But because we use {0, 1} as the label, so the loss becomes:
+
+               (1 - e_{1-y}) * l(t,y) - e_{y} * l(t,1-y)
+        loss = -----------------------------------------
+                        1 - e_{+1} - e_{-1}
+        """
+        self.mlp.train()
+        y_pred = self.mlp(X)
+        c1 = torch.tensor(1 - self.e[[int(1-yy) for yy in y]], dtype=torch.float)
+        c2 = torch.tensor(self.e[[int(yy) for yy in y]], dtype=torch.float)
+        y = torch.tensor(y, dtype=torch.float)
+        loss1 = c1 * self.loss_func(y_pred, y)
+        loss2 = c2 * self.loss_func(y_pred, 1 - y)
+        loss = torch.mean((loss1 - loss2) / (1 - self.e.sum()))
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        return loss.item()
+
+
 class PeerBinaryClassifier(BinaryClassifier):
     def __init__(self, feature_dim, lr, hidsize, dropout, alpha):
         super(PeerBinaryClassifier, self).__init__(feature_dim, lr, hidsize, dropout)
@@ -95,7 +126,7 @@ class PeerBinaryClassifier(BinaryClassifier):
         y = torch.tensor(y, dtype=torch.float)
         y_pred_ = self.mlp(X_)
         y_ = torch.tensor(y_, dtype=torch.float)
-        loss = self.criterion(y_pred, y) - self.alpha * self.criterion(y_pred_, y_)
+        loss = self.loss_func(y_pred, y) - self.alpha * self.loss_func(y_pred_, y_)
 
         self.optimizer.zero_grad()
         loss.backward()

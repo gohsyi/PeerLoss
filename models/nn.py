@@ -34,10 +34,10 @@ class MLP(nn.Module):
 
 
 class BinaryClassifier(object):
-    def __init__(self, feature_dim, lr, hidsize, dropout):
+    def __init__(self, feature_dim, learning_rate, hidsize, dropout):
         self.mlp = MLP(feature_dim, hidsize, dropout)
         self.loss_func = torch.nn.BCEWithLogitsLoss()
-        self.optimizer = torch.optim.Adam(self.mlp.parameters(), lr)
+        self.optimizer = torch.optim.Adam(self.mlp.parameters(), learning_rate)
 
     def predict(self, X):
         self.mlp.eval()
@@ -80,8 +80,8 @@ class BinaryClassifier(object):
 
 
 class SurrogateBinaryClassifier(BinaryClassifier):
-    def __init__(self, feature_dim, lr, hidsize, dropout, e0, e1):
-        super(SurrogateBinaryClassifier, self).__init__(feature_dim, lr, hidsize, dropout)
+    def __init__(self, feature_dim, learning_rate, hidsize, dropout, e0, e1):
+        super(SurrogateBinaryClassifier, self).__init__(feature_dim, learning_rate, hidsize, dropout)
         self.loss_func = torch.nn.BCEWithLogitsLoss(reduction='none')
         self.e = np.array([e0, e1], dtype=float)
 
@@ -115,8 +115,8 @@ class SurrogateBinaryClassifier(BinaryClassifier):
 
 
 class PeerBinaryClassifier(BinaryClassifier):
-    def __init__(self, feature_dim, lr, hidsize, dropout, alpha):
-        super(PeerBinaryClassifier, self).__init__(feature_dim, lr, hidsize, dropout)
+    def __init__(self, feature_dim, learning_rate, hidsize, dropout, alpha):
+        super(PeerBinaryClassifier, self).__init__(feature_dim, learning_rate, hidsize, dropout)
         self.alpha = alpha
 
     def train(self, X, y, X_, y_):

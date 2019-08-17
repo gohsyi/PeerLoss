@@ -5,7 +5,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', type=str, default='heart', choices=[
         'heart', 'breast', 'breast2', 'german', 'banana', 'image', 'thyroid',
-        'titanic', 'splice', 'twonorm', 'waveform', 'flare-solar'
+        'titanic', 'splice', 'twonorm', 'waveform', 'flare-solar', 'diabetes',
     ])
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--e0', type=float, default=0.2)

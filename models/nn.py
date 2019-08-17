@@ -36,6 +36,8 @@ class MLP(nn.Module):
 class BinaryClassifier(object):
     def __init__(self, feature_dim, learning_rate, hidsize, dropout):
         self.mlp = MLP(feature_dim, hidsize, dropout)
+        if torch.cuda.is_available():
+            self.mlp.cuda()
         self.loss_func = torch.nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.Adam(self.mlp.parameters(), learning_rate)
 

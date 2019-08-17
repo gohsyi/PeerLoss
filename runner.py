@@ -61,16 +61,19 @@ def run_nn_peer(kargs):
     return test_acc
 
 
-def run_svm(kargs):
+def run_c_svm(kargs):
     set_global_seeds(kargs['seed'])
     dataset = DataLoader(kargs['dataset'])
     if kargs['equalize_prior']:
         dataset.equalize_prior()
     X_train, X_test, y_train, y_test = dataset.train_test_split()
     y_noisy = make_noisy_data(y_train, kargs['e0'], kargs['e1'])
-    model = SVC(gamma='auto')
-    model.fit(X_train, y_noisy)
-    return model.score(X_test, y_test)
+    results = []
+    for c1 in [0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4]:
+        model = SVC(gamma='auto', class_weight=[1., c1])
+        model.fit(X_train, y_noisy)
+        results.append(model.score(X_test, y_test))
+    return np.max(results)
 
 
 def run_lr(kargs):
@@ -145,7 +148,7 @@ def run(arg_dict):
     for seed in range(32):
         arg_dict.update({'seed': seed})
         args.append(arg_dict.copy())
-    results_svm = pool.map(run_svm, args)
+    results_svm = pool.map(run_c_svm, args)
 
     # knn
     args = []

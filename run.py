@@ -214,7 +214,7 @@ def run(arg_dict):
     best_batchsize, best_lr, best_hidsize = zip(*best_params)
     best_batchsize = BATCH_SIZES[np.bincount(best_batchsize).argmax()]
     best_lr = LEARNING_RATES[np.bincount(best_lr).argmax()]
-    best_hidsize = LEARNING_RATES[np.bincount(best_hidsize).argmax()]
+    best_hidsize = HIDSIZES[np.bincount(best_hidsize).argmax()]
 
     nn_arg['batchsize'] = best_batchsize
     nn_arg['lr'] = best_lr

@@ -19,6 +19,8 @@ class MLP(nn.Module):
         )
 
     def forward(self, x):
+        if torch.cuda.is_available():
+            x = x.cuda()
         if type(x) != torch.Tensor:
             x = torch.tensor(x, dtype=torch.float)
         if x.dim() < 2:

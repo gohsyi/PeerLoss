@@ -2,29 +2,26 @@ import numpy as np
 import torch
 import torch.nn as nn
 from sklearn.metrics import accuracy_score
-from sklearn.utils import shuffle
 
 
 class MLP(nn.Module):
-    def __init__(self, feature_dim, hidsize, dropout):
+    def __init__(self, feature_dim, hidsizes, dropout):
         super(MLP, self).__init__()
-        self.mlp = nn.Sequential(
-            nn.Linear(feature_dim, hidsize),
-            nn.Dropout(dropout),
-            nn.ReLU(),
-            nn.Linear(hidsize, hidsize),
-            nn.Dropout(dropout),
-            nn.ReLU(),
-            nn.Linear(hidsize, 1)
-        )
+        self.mlp = []
+        hidsizes = [feature_dim] + hidsizes
+        for i in range(1, len(hidsizes)):
+            self.mlp.append(nn.Linear(hidsizes[i-1], hidsizes[i]))
+            self.mlp.append(nn.Dropout(dropout))
+            self.mlp.append(nn.ReLU())
+        self.mlp = nn.Sequential(*self.mlp, nn.Linear(hidsizes[-1], 1))
 
     def forward(self, x):
-        if torch.cuda.is_available():
-            x = x.cuda()
         if type(x) != torch.Tensor:
             x = torch.tensor(x, dtype=torch.float)
         if x.dim() < 2:
             x = x.unsqueeze(0)
+        if torch.cuda.is_available():
+            x = x.cuda()
         return self.mlp(x).squeeze(-1)
 
     @staticmethod
@@ -67,20 +64,18 @@ class BinaryClassifier(object):
         train_acc, test_acc = [], []
         batchsize = batchsize or len(X_train)
         m = X_train.shape[0]
+        losses = []
 
         for ep in range(episodes):
-            X_train, y_train = shuffle(X_train, y_train)
-            for i in range(0, m, batchsize):
-                j = min(i + batchsize, m)
-                mb_X_train = X_train[i:j]
-                mb_y_train = y_train[i:j]
-                loss = self.train(mb_X_train, mb_y_train)
-
+            mb_idxes = np.random.choice(m, batchsize, replace=False)
+            mb_X_train, mb_y_train = X_train[mb_idxes], y_train[mb_idxes]
+            loss = self.train(mb_X_train, mb_y_train)
+            losses.append(loss)
             train_acc.append(self.test(X_train, y_train))
             if X_test is not None and y_test is not None:
                 test_acc.append(self.test(X_test, y_test))
 
-        return train_acc, test_acc
+        return {'loss': losses, 'train_acc': train_acc, 'test_acc': test_acc}
 
 
 class SurrogateBinaryClassifier(BinaryClassifier):
@@ -138,22 +133,20 @@ class PeerBinaryClassifier(BinaryClassifier):
         return loss.item()
 
     def fit(self, X_train, y_train, X_test=None, y_test=None, episodes=100, batchsize=None):
+        losses = []
         train_acc, test_acc = [], []
         batchsize = batchsize or len(X_train)
         m = X_train.shape[0]
 
         for ep in range(episodes):
-            X_train, y_train = shuffle(X_train, y_train)
-            for i in range(0, m, batchsize):
-                j = min(i + batchsize, m)
-                mb_X_train = X_train[i:j]
-                mb_y_train = y_train[i:j]
-                mb_X_train_ = X_train[np.random.choice(m, batchsize)]
-                mb_y_train_ = y_train[np.random.choice(m, batchsize)]
-                loss = self.train(mb_X_train, mb_y_train, mb_X_train_, mb_y_train_)
-
+            mb_idxes = np.random.choice(m, batchsize, replace=False)
+            mb_X_train, mb_y_train = X_train[mb_idxes], y_train[mb_idxes]
+            mb_X_train_ = X_train[np.random.choice(m, batchsize, replace=False)]
+            mb_y_train_ = y_train[np.random.choice(m, batchsize, replace=False)]
+            loss = self.train(mb_X_train, mb_y_train, mb_X_train_, mb_y_train_)
+            losses.append(loss)
             train_acc.append(self.test(X_train, y_train))
             if X_test is not None and y_test is not None:
                 test_acc.append(self.test(X_test, y_test))
 
-        return train_acc, test_acc
+        return {'loss': losses, 'train_acc': train_acc, 'test_acc': test_acc}

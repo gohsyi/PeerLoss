@@ -15,7 +15,7 @@ class Perceptron(object):
         self.lr = learning_rate
         self.margin = margin
 
-    def fit(self, X_train, y_train, epochs=1000):
+    def fit(self, X_train, y_train, epochs=10):
         pred_acc = []
         updates_list = []
         y_train[y_train == 0] = -1
@@ -28,7 +28,6 @@ class Perceptron(object):
             updates_list.append(updates)
             pred_acc.append(np.mean(y_train == y_pred))
 
-        print(f'margin:{self.margin}\ttrain_acc:{np.mean(pred_acc[-100:])}')
         return pred_acc
 
     def _predict_and_update(self, X, y):

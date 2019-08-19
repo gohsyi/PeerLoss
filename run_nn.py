@@ -9,10 +9,9 @@ from utils.misc import set_global_seeds, make_arg_list
 
 from models.nn import BinaryClassifier, PeerBinaryClassifier, SurrogateBinaryClassifier
 
-
-BATCH_SIZES = [4, 8, 16, 32, 64, 128]
-HIDSIZES = [8, 16, 32, 64]
-LEARNING_RATES = [0.0005, 0.001, 0.005, 0.01]
+BATCH_SIZES = [1, 4, 16, 64]
+HIDSIZES = [8, 16, 32]
+LEARNING_RATES = [0.001, 0.005, 0.01]
 
 
 def find_best_params(args):
@@ -23,18 +22,19 @@ def find_best_params(args):
     for i, batchsize in enumerate(BATCH_SIZES):
         for j, lr in enumerate(LEARNING_RATES):
             for k, hidsize in enumerate(HIDSIZES):
-                classifier = BinaryClassifier(
+                classifier = PeerBinaryClassifier(
                     feature_dim=X_train.shape[-1],
                     learning_rate=lr,
-                    hidsize=hidsize,
-                    dropout=args['dropout']
+                    hidsize=[hidsize, hidsize],
+                    dropout=args['dropout'],
+                    alpha=args['alpha']
                 )
-                train_acc, test_acc = classifier.fit(
+                results = classifier.fit(
                     X_train, y_noisy, X_test, y_test,
                     batchsize=batchsize,
                     episodes=args['episodes'],
                 )
-                acc = np.max(test_acc)
+                acc = np.mean(results['test_acc'][-100:])
                 if acc > best_acc:
                     best_acc = acc
                     best_params = (i, j, k)
@@ -51,14 +51,12 @@ def run_nn(args):
         hidsize=args['hidsize'],
         dropout=args['dropout']
     )
-    train_acc, test_acc = classifier.fit(
+    results = classifier.fit(
         X_train, y_noisy, X_test, y_test,
         batchsize=args['batchsize'],
         episodes=args['episodes'],
     )
-    if 'verbose' in args.keys():
-        plot([[train_acc], [test_acc]], ['nn during train', 'nn during test'])
-    return test_acc
+    return results
 
 
 def run_nn_surr(args):
@@ -73,16 +71,12 @@ def run_nn_surr(args):
         e0=args['e0'],
         e1=args['e1'],
     )
-    train_acc, test_acc = classifier.fit(
+    results = classifier.fit(
         X_train, y_noisy, X_test, y_test,
         batchsize=args['batchsize'],
         episodes=args['episodes'],
     )
-    if 'verbose' in args.keys():
-        plot([[train_acc], [test_acc]],
-             ['nn with surrogate loss during train',
-              'nn with surrogate loss during test'])
-    return test_acc
+    return results
 
 
 def run_nn_peer(args):
@@ -96,14 +90,12 @@ def run_nn_peer(args):
         dropout=args['dropout'],
         alpha=args['alpha'],
     )
-    train_acc, test_acc = classifier.fit(
+    results = classifier.fit(
         X_train, y_noisy, X_test, y_test,
         batchsize=args['batchsize'],
         episodes=args['episodes'],
     )
-    if 'verbose' in args.keys():
-        plot([[train_acc], [test_acc]], ['nn with peer loss during train', 'nn with peer loss during test'])
-    return test_acc
+    return results
 
 
 def get_max_mean(result):
@@ -126,7 +118,7 @@ def run(args):
 
         nn_arg['batchsize'] = best_batchsize
         nn_arg['lr'] = best_lr
-        nn_arg['hidsize'] = best_hidsize
+        nn_arg['hidsize'] = [best_hidsize, best_hidsize]
 
         logger.record_tabular('[NN] best batchsize', best_batchsize)
         logger.record_tabular('[NN] best learning rate', best_lr)
@@ -137,12 +129,25 @@ def run(args):
     results_peer = pool.map(run_nn_peer, make_arg_list(nn_arg))
     results_surr = pool.map(run_nn_surr, make_arg_list(nn_arg))
 
-    plot([results_bce, results_peer, results_surr],
-         ['use cross entropy loss', 'use peer loss', 'use surrogate loss'])
+    test_acc_bce = [res['test_acc'] for res in results_bce]
+    test_acc_peer = [res['test_acc'] for res in results_peer]
+    test_acc_surr = [res['test_acc'] for res in results_surr]
 
-    logger.record_tabular('[NN] with peer loss', get_max_mean(np.mean(results_peer, 0)))
-    logger.record_tabular('[NN] with surrogate loss', get_max_mean(np.mean(results_surr, 0)))
-    logger.record_tabular('[NN] with cross entropy loss', get_max_mean(np.mean(results_bce, 0)))
+    plot([test_acc_bce, test_acc_peer, test_acc_surr],
+         ['cross entropy loss', 'peer loss', 'surrogate loss'],
+         title='Accuracy During Testing')
+
+    train_acc_bce = [res['train_acc'] for res in results_bce]
+    train_acc_peer = [res['train_acc'] for res in results_peer]
+    train_acc_surr = [res['train_acc'] for res in results_surr]
+
+    plot([train_acc_bce, train_acc_peer, train_acc_surr],
+         ['cross entropy loss', 'peer loss', 'surrogate loss'],
+         title='Accuracy During Training')
+
+    logger.record_tabular('[NN] with peer loss', np.mean(test_acc_peer, 0)[-100:].mean())
+    logger.record_tabular('[NN] with surrogate loss', np.mean(test_acc_surr, 0)[-100:].mean())
+    logger.record_tabular('[NN] with cross entropy loss', np.mean(test_acc_bce, 0)[-100:].mean())
     logger.dump_tabular()
 
 

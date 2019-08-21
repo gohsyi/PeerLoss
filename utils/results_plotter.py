@@ -63,6 +63,23 @@ def plot(results, labels, title=None):
     plt.show()
 
 
+def plot__(results, labels, title=None):
+    for i, (result, label) in enumerate(zip(results, labels)):
+        plt.plot(results[0], label=label, color=f'C{i}')
+        for res in result[1:]:
+            plt.plot(res, color=f'C{i}')
+        _min = gaussian_filter1d(np.min(result, 0), sigma=3)
+        _max = gaussian_filter1d(np.max(result, 0), sigma=3)
+        plt.fill_between(range(len(_min)), _min, _max, color=f'C{i}', alpha=0.3)
+
+    if title:
+        plt.title(title)
+    plt.xlabel('episodes')
+    # plt.legend()
+    plt.grid()
+    plt.show()
+
+
 def main():
     args = parse_args()
     folder = f'logs/{args.log}'

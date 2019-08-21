@@ -8,27 +8,27 @@ from utils import logger
 from utils.dataloader import DataLoader
 from utils.misc import set_global_seeds, make_arg_list
 
-CLASS_WEIGHTS = [0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4]
+CLASS_WEIGHTS = [0.1, 0.2, 0.25, 0.33, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 10.0]
 
 
 def find_best_c1(args):
     set_global_seeds(args['seed'])
     dataset = DataLoader(args['dataset'])
-    X_train, X_test, y_noisy, y_test = dataset.prepare_train_test(args)
+    X_train, X_test, X_val, y_train, y_test, y_val = dataset.prepare_train_test_val(args)
     results = []
     for c1 in CLASS_WEIGHTS:
         model = SVC(gamma='auto', class_weight={0: 1., 1: c1})
-        model.fit(X_train, y_noisy)
-        results.append(model.score(X_test, y_test))
-    return np.argmax(results)
+        model.fit(X_train, y_train)
+        results.append(model.score(X_val, y_val))
+    return results
 
 
 def run_c_svm(args):
     set_global_seeds(args['seed'])
     dataset = DataLoader(args['dataset'])
-    X_train, X_test, y_noisy, y_test = dataset.prepare_train_test(args)
+    X_train, X_test, X_val, y_train, y_test, y_val = dataset.prepare_train_test_val(args)
     model = SVC(gamma='auto', class_weight={0: 1., 1: args['C1']})
-    model.fit(X_train, y_noisy)
+    model.fit(X_train, y_train)
     return model.score(X_test, y_test)
 
 
@@ -40,8 +40,13 @@ def run(args):
     svm_arg = args.copy()
 
     if 'C1' not in svm_arg.keys():
-        best_c1 = pool.map(find_best_c1, make_arg_list(svm_arg))
-        best_c1 = CLASS_WEIGHTS[np.bincount(best_c1).argmax()]
+        best_c1 = pool.map(find_best_c1, make_arg_list(svm_arg, seeds=8))
+        best_c1 = np.mean(best_c1, 0)
+        if 'verbose' in svm_arg.keys() and svm_arg['verbose']:
+            for i in range(len(best_c1)):
+                logger.record_tabular(f'[C-SVM] C1 = {CLASS_WEIGHTS[i]}', best_c1[i])
+            logger.dump_tabular()
+        best_c1 = CLASS_WEIGHTS[best_c1.argmax()]
         logger.record_tabular('[C-SVM] best C1', best_c1)
         svm_arg['C1'] = best_c1
 

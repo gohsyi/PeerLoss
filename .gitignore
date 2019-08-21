@@ -105,3 +105,4 @@ venv.bak/
 
 .idea/
 .DS_Store
+uci/large/

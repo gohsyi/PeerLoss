@@ -8,18 +8,24 @@ from sklearn.preprocessing import StandardScaler
 class DataLoader(object):
     def __init__(self, name):
         self.name = name
+        if name == 'susy':
+            self.df = pd.read_csv(f'uci/large/SUSY.csv', header=None)
+            self.preprocess_susy()
+        if name == 'higgs':
+            self.df = pd.read_csv(f'uci/large/HIGGS.csv', header=None)
+            self.preprocess_susy()
         if name == 'heart':
             self.df = pd.read_csv(f'uci/heart.csv')
             self.preprocess_heart()
         elif name == 'breast':
-            self.df = pd.read_csv(f'uci/breast-cancer.data', header=None)
+            self.df = pd.read_csv(f'uci/breast-cancer.data', header=None, sep=',')
             self.preprocess_breast()
-            self.categorical()
         elif name == 'breast2':
             self.df = pd.read_csv(f'uci/breast.csv')
             self.preprocess_breast2()
         elif name == 'german':
-            self.df = pd.read_csv('uci/german.csv')
+            self.df = pd.read_csv('uci/german.data', header=None, sep=' ')
+            self.preprocess_german()
         elif name == 'banana':
             self.df = pd.read_csv('uci/banana.csv')
         elif name == 'image':
@@ -53,12 +59,22 @@ class DataLoader(object):
     def categorical(self):
         self.df = onehot(self.df, [col for col in self.df.columns if col != 'target'])
 
+    def preprocess_susy(self):
+        self.df.rename(columns={0: 'target'}, inplace=True)
+
     def preprocess_heart(self):
         self.df = onehot(self.df, ['cp', 'slope', 'thal', 'restecg'])
+
+    def preprocess_german(self):
+        self.df.rename(columns={20: 'target'}, inplace=True)
+        self.df.target.replace({2: 0}, inplace=True)
+        cate_cols = [i for i in self.df.columns if self.df[i].dtype == 'object']
+        self.df = onehot(self.df, cate_cols)
 
     def preprocess_breast(self):
         self.df.rename(columns={0: 'target'}, inplace=True)
         self.df.target.replace({'no-recurrence-events': 0, 'recurrence-events': 1}, inplace=True)
+        self.categorical()
 
     def preprocess_breast2(self):
         self.df.replace({'M': 1, 'B': 0}, inplace=True)
@@ -87,12 +103,39 @@ class DataLoader(object):
             self.X_test = sc.transform(self.X_test)
         return self.X_train, self.X_test, self.y_train, self.y_test
 
+    def train_test_val_split(self, test_size=0.2, val_size=0.1, normalize=True):
+        X = self.df.drop(['target'], axis=1).values
+        y = self.df.target.values
+        self.X_train, self.X_test, self.y_train, self.y_test = \
+            train_test_split(X, y, test_size=test_size)
+        self.X_train, self.X_val, self.y_train, self.y_val = \
+            train_test_split(self.X_train, self.y_train, test_size=val_size/(1-test_size))
+        if normalize:
+            sc = StandardScaler()
+            self.X_train = sc.fit_transform(self.X_train)
+            self.X_test = sc.transform(self.X_test)
+            self.X_val = sc.transform(self.X_val)
+        return self.X_train, self.X_test, self.X_val, self.y_train, self.y_test, self.y_val
+
     def prepare_train_test(self, kargs):
         if kargs['equalize_prior']:
             self.equalize_prior()
         X_train, X_test, y_train, y_test = self.train_test_split(kargs['test_size'], kargs['normalize'])
         y_noisy = make_noisy_data(y_train, kargs['e0'], kargs['e1'])
         return X_train, X_test, y_noisy, y_test
+
+    def prepare_train_test_val(self, kargs):
+        if kargs['equalize_prior']:
+            self.equalize_prior()
+        X_train, X_test, X_val, y_train, y_test, y_val = self.train_test_val_split(
+            test_size=kargs['test_size'],
+            val_size=kargs['val_size'],
+            normalize=kargs['normalize'],
+        )
+        y_train_noisy = make_noisy_data(y_train, kargs['e0'], kargs['e1'])
+        y_val_noisy = make_noisy_data(y_val, kargs['e0'], kargs['e1'])
+        return X_train, X_test, X_val, y_train_noisy, y_test, y_val_noisy
+
 
 def onehot(df, cols):
     dummies = [pd.get_dummies(df[col]) for col in cols]

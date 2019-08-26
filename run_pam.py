@@ -8,7 +8,7 @@ from utils import logger
 from utils.dataloader import DataLoader
 from utils.misc import set_global_seeds, make_arg_list
 
-MARGINS = [0., 0.1, 0.2, 0.3, 0.4, 0.5]
+MARGINS = [0, 0.125, 0.25, 0.5, 1]
 
 
 def find_best_margin(args):

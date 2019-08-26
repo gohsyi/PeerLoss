@@ -15,7 +15,7 @@ class Perceptron(object):
         self.lr = learning_rate
         self.margin = margin
 
-    def fit(self, X_train, y_train, epochs=10):
+    def fit(self, X_train, y_train, epochs=100):
         pred_acc = []
         updates_list = []
         y_train[y_train == 0] = -1

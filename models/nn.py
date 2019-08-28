@@ -112,7 +112,8 @@ class BinaryClassifier(object):
         acc = accuracy_score(y, y_pred)
         return acc
 
-    def fit(self, X_train, y_train, X_val=None, y_val=None, episodes=100, batchsize=None):
+    def fit(self, X_train, y_train, X_val=None, y_val=None, episodes=100, batchsize=None, 
+            val_interval=20, log_interval=100, logger=None):
         if self.transform_y:
             y_train[y_train == 0] = -1
             if y_val is not None:
@@ -127,9 +128,17 @@ class BinaryClassifier(object):
             mb_X_train, mb_y_train = X_train[mb_idxes], y_train[mb_idxes]
             loss = self.train(mb_X_train, mb_y_train)
             losses.append(loss)
-            train_acc.append(self.val(X_train, y_train))
-            if X_val is not None and y_val is not None:
+            
+            if ep % val_interval == 0 and X_val is not None and y_val is not None:
+                train_acc.append(self.val(X_train, y_train))
                 val_acc.append(self.val(X_val, y_val))
+            if logger is not None and ep % log_interval == 0:
+                logger.record_tabular('ep', ep)
+                logger.record_tabular('loss', np.mean(losses[-log_interval:]))
+                logger.record_tabular('train_acc', np.mean(train_acc[-log_interval//val_interval:]))
+                if X_val is not None and y_val is not None:
+                    logger.record_tabular('val_acc', np.mean(val_acc[-log_interval//val_interval:]))
+                logger.dump_tabular()
 
         return {'loss': losses, 'train_acc': train_acc, 'val_acc': val_acc}
 
@@ -203,7 +212,8 @@ class PeerBinaryClassifier(BinaryClassifier):
         self.optimizer.step()
         return loss.item()
 
-    def fit(self, X_train, y_train, X_val=None, y_val=None, episodes=100, batchsize=None):
+    def fit(self, X_train, y_train, X_val=None, y_val=None, episodes=100, batchsize=None,
+            val_interval=20, log_interval=100, logger=None):
         if self.transform_y:
             y_train[y_train == 0] = -1
             if y_val is not None:
@@ -220,9 +230,17 @@ class PeerBinaryClassifier(BinaryClassifier):
             mb_y_train_ = y_train[np.random.choice(m, batchsize, replace=False)]
             loss = self.train(mb_X_train, mb_y_train, mb_X_train_, mb_y_train_)
             losses.append(loss)
-            train_acc.append(self.val(X_train, y_train))
-            if X_val is not None and y_val is not None:
+            
+            if ep % val_interval == 0 and X_val is not None and y_val is not None:
+                train_acc.append(self.val(X_train, y_train))
                 val_acc.append(self.val(X_val, y_val))
+            if logger is not None and ep % log_interval == 0:
+                logger.record_tabular('ep', ep)
+                logger.record_tabular('loss', np.mean(losses[-log_interval:]))
+                logger.record_tabular('train_acc', np.mean(train_acc[-log_interval//val_interval:]))
+                if X_val is not None and y_val is not None:
+                    logger.record_tabular('val_acc', np.mean(val_acc[-log_interval//val_interval:]))
+                logger.dump_tabular()
 
         return {
             'loss': losses,

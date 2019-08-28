@@ -9,13 +9,29 @@ from utils.misc import set_global_seeds, make_arg_list
 
 from models.nn import MLP, BinaryClassifier, PeerBinaryClassifier, SurrogateBinaryClassifier
 
-ALPHAS = np.linspace(0.1, 1.0, 10)
+ALPHAS = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
 BATCH_SIZES = [1, 4, 16, 32, 64]
 HIDSIZES = [[8, 8], [16, 16], [32, 32], [64, 64]]
 LEARNING_RATES = [0.0007, 0.001, 0.005, 0.01, 0.05]
 
 
 def find_best_alpha(args, alphas=ALPHAS):
+    pool = mp.Pool(mp.cpu_count())
+    results = []
+    for alpha in alphas:
+        args['alpha'] = alpha
+        res = [res['val_acc'] for res in pool.map(run_nn_peer, make_arg_list(args, 8))]
+        res = np.mean(res, axis=0)
+        res = np.mean(res[-100:])
+        if 'verbose' in args.keys() and args['verbose']:
+            logger.record_tabular(f'[PEER] alpha = {alpha}', res)
+        results.append(res)
+    logger.dump_tabular()
+    best_alpha = alphas[np.argmax(results)]
+    return {'alpha': best_alpha}
+
+
+def find_best_alpha_val(args, alphas=ALPHAS):
     pool = mp.Pool(mp.cpu_count())
     results = []
     for alpha in alphas:
@@ -164,7 +180,11 @@ def run(args):
         logger.dump_tabular()
 
     if 'alpha' not in nn_arg.keys():
-        nn_arg.update(find_best_alpha(nn_arg))
+        nn_arg.update(find_best_alpha_val(nn_arg))
+        logger.record_tabular('[PEER] best alpha', nn_arg['alpha'])
+    elif type(nn_arg['alpha']) == list or type(nn_arg['alpha']) == np.ndarray:
+        nn_arg.update(find_best_alpha_val(nn_arg, nn_arg['alpha']))
+        logger.record_tabular('[PEER] best alpha', nn_arg['alpha'])
 
     results_surr = pool.map(run_nn_surr, make_arg_list(nn_arg))
     results_nn = pool.map(run_nn, make_arg_list(nn_arg))

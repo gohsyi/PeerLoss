@@ -9,7 +9,7 @@ from utils.misc import set_global_seeds, make_arg_list
 
 from models.nn import MLP, BinaryClassifier, PeerBinaryClassifier, SurrogateBinaryClassifier
 
-ALPHAS = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
+ALPHAS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 BATCH_SIZES = [1, 4, 16, 32, 64]
 HIDSIZES = [[8, 8], [16, 16], [32, 32], [64, 64]]
 LEARNING_RATES = [0.0007, 0.001, 0.005, 0.01, 0.05]
@@ -21,11 +21,12 @@ def find_best_alpha(args, alphas=ALPHAS):
     for alpha in alphas:
         args['alpha'] = alpha
         res = [res['val_acc'] for res in pool.map(run_nn_peer, make_arg_list(args, 8))]
-        res = np.mean(res, axis=0)
-        res = np.mean(res[-100:])
+        res = np.mean(res, axis=0)[-1]
         if 'verbose' in args.keys() and args['verbose']:
             logger.record_tabular(f'[PEER] alpha = {alpha}', res)
         results.append(res)
+    pool.close()
+    pool.join()
     logger.dump_tabular()
     best_alpha = alphas[np.argmax(results)]
     return {'alpha': best_alpha}
@@ -38,10 +39,12 @@ def find_best_alpha_val(args, alphas=ALPHAS):
         args['alpha'] = alpha
         res = [res['val_acc'] for res in pool.map(run_nn_peer_val, make_arg_list(args, 8))]
         res = np.mean(res, axis=0)
-        res = np.mean(res[-100:])
+        res = np.mean(res[-1])
         if 'verbose' in args.keys() and args['verbose']:
             logger.record_tabular(f'[PEER] alpha = {alpha}', res)
         results.append(res)
+    pool.close()
+    pool.join()
     logger.dump_tabular()
     best_alpha = alphas[np.argmax(results)]
     return {'alpha': best_alpha}
@@ -59,9 +62,9 @@ def find_best_params(args, batchsizes=None, lrs=None, hidsizes=None):
     lrs = lrs or [args['lr']]
     hidsizes = hidsizes or [args['hidsize']]
 
-    for i, batchsize in enumerate(batchsizes):
-        for j, lr in enumerate(lrs):
-            for k, hidsize in enumerate(hidsizes):
+    for k, hidsize in enumerate(hidsizes):
+        for i, batchsize in enumerate(batchsizes):
+            for j, lr in enumerate(lrs):
                 args.update({
                     'batchsize': batchsize,
                     'hidsize': hidsize,
@@ -69,12 +72,14 @@ def find_best_params(args, batchsizes=None, lrs=None, hidsizes=None):
                 })
                 res = [res['val_acc'] for res in pool.map(run_nn_peer, make_arg_list(args, 8))]
                 res = np.mean(res, axis=0)
-                results[i, j, k] = np.mean(res[-100:])
+                results[i, j, k] = np.mean(res[-1])
                 if 'verbose' in args.keys() and args['verbose']:
-                    print(f'acc:{results[i, j, k]:4}\t'
+                    print(f'acc:{results[i, j, k]:4.3}\t'
+                          f'hidsize:{str(hidsize):8}\t'
                           f'batchsize:{batchsize:2}\t'
-                          f'lr:{lr:6}\thidsize:{hidsize}')
-
+                          f'lr:{lr:6}\t')
+    pool.close()
+    pool.join()
     best_batchsize, best_lr, best_hidsize = np.unravel_index(results.reshape(-1).argmax(), results.shape)
     best_acc = results.max()
     best_batchsize = batchsizes[best_batchsize]
@@ -189,6 +194,8 @@ def run(args):
     results_surr = pool.map(run_nn_surr, make_arg_list(nn_arg))
     results_nn = pool.map(run_nn, make_arg_list(nn_arg))
     results_peer = pool.map(run_nn_peer, make_arg_list(nn_arg))
+    pool.close()
+    pool.join()
 
     test_acc_bce = [res['val_acc'] for res in results_nn]
     test_acc_peer = [res['val_acc'] for res in results_peer]
@@ -214,9 +221,9 @@ def run(args):
          ['cross entropy loss', 'peer loss', 'surrogate loss'],
          title='Loss')
 
-    logger.record_tabular('[NN] with peer loss', np.mean(test_acc_peer, 0)[-100:].mean())
-    logger.record_tabular('[NN] with surrogate loss', np.mean(test_acc_surr, 0)[-100:].mean())
-    logger.record_tabular(f'[NN] with {args["loss"]} loss', np.mean(test_acc_bce, 0)[-100:].mean())
+    logger.record_tabular('[NN] with peer loss', np.mean(test_acc_peer, 0)[-1])
+    logger.record_tabular('[NN] with surrogate loss', np.mean(test_acc_surr, 0)[-1])
+    logger.record_tabular(f'[NN] with {args["loss"]} loss', np.mean(test_acc_bce, 0)[-1])
     logger.dump_tabular()
 
 

@@ -103,18 +103,19 @@ class DataLoader(object):
             self.X_test = sc.transform(self.X_test)
         return self.X_train, self.X_test, self.y_train, self.y_test
 
-    def train_test_val_split(self, test_size=0.2, val_size=0.1, normalize=True):
+    def train_test_val_split(self, e0, e1, test_size=0.2, val_size=0.1, normalize=True):
         X = self.df.drop(['target'], axis=1).values
         y = self.df.target.values
         self.X_train, self.X_test, self.y_train, self.y_test = \
             train_test_split(X, y, test_size=test_size)
-        self.X_train, self.X_val, self.y_train, self.y_val = \
-            train_test_split(self.X_train, self.y_train, test_size=val_size/(1-test_size))
         if normalize:
             sc = StandardScaler()
             self.X_train = sc.fit_transform(self.X_train)
             self.X_test = sc.transform(self.X_test)
-            self.X_val = sc.transform(self.X_val)
+        self.X_train, self.X_val, self.y_train, self.y_val = \
+            train_test_split(self.X_train, self.y_train, test_size=val_size/(1-test_size))
+        self.y_train = make_noisy_data(self.y_train, e0, e1)
+        self.y_val = make_noisy_data(self.y_val, e0, e1)
         return self.X_train, self.X_test, self.X_val, self.y_train, self.y_test, self.y_val
 
     def prepare_train_test(self, kargs):
@@ -128,13 +129,12 @@ class DataLoader(object):
         if kargs['equalize_prior']:
             self.equalize_prior()
         X_train, X_test, X_val, y_train, y_test, y_val = self.train_test_val_split(
+            e0=kargs['e0'], e1=kargs['e1'],
             test_size=kargs['test_size'],
             val_size=kargs['val_size'],
             normalize=kargs['normalize'],
         )
-        y_train_noisy = make_noisy_data(y_train, kargs['e0'], kargs['e1'])
-        y_val_noisy = make_noisy_data(y_val, kargs['e0'], kargs['e1'])
-        return X_train, X_test, X_val, y_train_noisy, y_test, y_val_noisy
+        return X_train, X_test, X_val, y_train, y_test, y_val
 
 
 def onehot(df, cols):

@@ -46,7 +46,7 @@ def find_best_alpha_val(kargs):
     results = []
     for alpha in kargs['alpha']:
         args['alpha'] = alpha
-        res = [res['val_acc'] for res in pool.map(run_nn_peer_val, make_arg_list(args, args['seeds']))]
+        res = [res['val_acc'] for res in pool.map(run_nn_peer_val, make_arg_list(args))]
         res = np.mean(res, axis=0)[-1]
         if 'verbose' in args.keys() and args['verbose']:
             logger.record_tabular(f'[PEER] alpha = {alpha}', res)
@@ -81,7 +81,7 @@ def find_best_params(kargs):
                     'hidsize': hidsize,
                     'lr': lr,
                 })
-                res = [res['val_acc'] for res in pool.map(run_nn_peer, make_arg_list(args, kargs['seeds']))]
+                res = [res['val_acc'] for res in pool.map(run_nn_peer, make_arg_list(args))]
                 results[i, j, k] = np.mean(res, axis=0)[-1]
                 if 'verbose' in args.keys() and args['verbose']:
                     logger.info(

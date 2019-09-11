@@ -11,10 +11,10 @@ def set_global_seeds(i):
         torch.cuda.manual_seed_all(i)
 
 
-def make_arg_list(arg, seeds=8):
+def make_arg_list(arg):
     arg = arg.copy()
     args = []
-    for seed in range(seeds):
+    for seed in range(arg['seeds']):
         arg['seed'] = seed
         args.append(arg.copy())
     return args

@@ -45,7 +45,7 @@ def plot_(folder):
     print(f'The maximal mean test accuracy of 10 episodes is {max_mean}')
 
 
-def plot(results, labels, title=None):
+def plot(results, labels, title=None, path=None):
     for i, (result, label) in enumerate(zip(results, labels)):
         mean = np.mean(result, axis=0)
         std = np.std(result, axis=0)
@@ -60,7 +60,10 @@ def plot(results, labels, title=None):
     plt.xlabel('episodes')
     plt.legend()
     plt.grid()
-    plt.show()
+    if path:
+        plt.savefig(f'{path}/{title.replace(" ", "_")}.jpg')
+    else:
+        plt.show()
 
 
 def plot__(results, labels, title=None):

@@ -33,7 +33,7 @@ def run_c_svm(args):
 
 
 def run(args):
-    logger.configure(f'logs/svm/{datetime.datetime.now().strftime("%y-%m-%d-%H-%M-%S")}')
+    logger.configure(f'logs/{args["dataset"]}/svm/{datetime.datetime.now().strftime("%y-%m-%d-%H-%M-%S")}')
     logger.info(args)
 
     pool = mp.Pool(mp.cpu_count())

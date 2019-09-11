@@ -8,7 +8,7 @@ from utils import logger
 from utils.dataloader import DataLoader
 from utils.misc import set_global_seeds, make_arg_list
 
-MARGINS = [0, 0.125, 0.25, 0.5, 1]
+MARGINS = [0, 0.125, 0.25, 0.5, 1, 2, 3, 4, 5]
 
 
 def find_best_margin(args):
@@ -35,7 +35,7 @@ def run_pam(args):
 
 
 def run(args):
-    logger.configure(f'logs/pam/{datetime.datetime.now().strftime("%y-%m-%d-%H-%M-%S")}')
+    logger.configure(f'logs/{args["dataset"]}/pam/{datetime.datetime.now().strftime("%y-%m-%d-%H-%M-%S")}')
     logger.info(args)
 
     pool = mp.Pool(mp.cpu_count())

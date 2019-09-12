@@ -113,7 +113,7 @@ def run_nn(args):
     mlp = MLP(
         feature_dim=X_train.shape[-1],
         hidsizes=args['hidsize'],
-        dropout=args['dropout']
+        dropout=args['dropout'],
     )
     classifier = BinaryClassifier(
         model=mlp,
@@ -124,7 +124,7 @@ def run_nn(args):
         X_train, y_train, X_test, y_test,
         batchsize=args['batchsize'],
         episodes=args['episodes'],
-        logger=logger if args['seeds'] == 1 else None
+        logger=logger if args['seeds'] == 1 else None,
     )
     return results
 
@@ -172,6 +172,7 @@ def run_nn_peer(args):
     results = classifier.fit(
         X_train, y_train, X_test, y_test,
         batchsize=args['batchsize'],
+        batchsize_=args['batchsize_peer'],
         episodes=args['episodes'],
         logger=logger if args['seeds'] == 1 else None
     )

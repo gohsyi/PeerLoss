@@ -66,6 +66,7 @@ def plot(results, labels, title=None, path=None):
         plt.savefig(f'{path}/{title.replace(" ", "_")}.jpg')
     else:
         plt.show()
+    plt.cla()
 
 
 def plot__(results, labels, title=None):

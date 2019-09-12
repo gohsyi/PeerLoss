@@ -25,6 +25,9 @@ def parse_args():
     parser.add_argument('--batchsize', nargs='+', required=True, type=int,
                         default=[1, 4, 16, 32, 64],
                         help='batchsize for neural networks')
+    parser.add_argument('--batchsize-peer', nargs='+', required=True, type=int,
+                        default=[1, 4, 16, 32, 64],
+                        help='batchsize for neural networks')
 
     # hyper-parameters
     parser.add_argument('--alpha', nargs='+', type=float,

@@ -212,7 +212,7 @@ class PeerBinaryClassifier(BinaryClassifier):
         self.optimizer.step()
         return loss.item()
 
-    def fit(self, X_train, y_train, X_val=None, y_val=None, episodes=100, batchsize=None,
+    def fit(self, X_train, y_train, X_val=None, y_val=None, episodes=100, batchsize=None, batchsize_=None,
             val_interval=20, log_interval=100, logger=None):
         if self.transform_y:
             y_train[y_train == 0] = -1
@@ -221,13 +221,14 @@ class PeerBinaryClassifier(BinaryClassifier):
 
         losses, train_acc, val_acc = [], [], []
         batchsize = batchsize or len(X_train)
+        batchsize_ = batchsize_ or len(X_train)
         m = X_train.shape[0]
 
         for ep in range(episodes):
             mb_idxes = np.random.choice(m, batchsize, replace=False)
             mb_X_train, mb_y_train = X_train[mb_idxes], y_train[mb_idxes]
-            mb_X_train_ = X_train[np.random.choice(m, batchsize, replace=False)]
-            mb_y_train_ = y_train[np.random.choice(m, batchsize, replace=False)]
+            mb_X_train_ = X_train[np.random.choice(m, batchsize_, replace=False)]
+            mb_y_train_ = y_train[np.random.choice(m, batchsize_, replace=False)]
             loss = self.train(mb_X_train, mb_y_train, mb_X_train_, mb_y_train_)
             losses.append(loss)
             

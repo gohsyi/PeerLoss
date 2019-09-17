@@ -42,7 +42,7 @@ def run(args):
     pam_arg = args.copy()
 
     if 'margin' not in pam_arg.keys():
-        best_margin = pool.map(find_best_margin, make_arg_list(pam_arg, seeds=8))
+        best_margin = pool.map(find_best_margin, make_arg_list(pam_arg))
         best_margin = np.mean(best_margin, 0)
         if 'verbose' in pam_arg.keys() and pam_arg['verbose']:
             for i in range(len(best_margin)):

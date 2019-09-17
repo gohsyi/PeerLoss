@@ -40,7 +40,7 @@ def run(args):
     svm_arg = args.copy()
 
     if 'C1' not in svm_arg.keys():
-        best_c1 = pool.map(find_best_c1, make_arg_list(svm_arg, seeds=8))
+        best_c1 = pool.map(find_best_c1, make_arg_list(svm_arg))
         best_c1 = np.mean(best_c1, 0)
         if 'verbose' in svm_arg.keys() and svm_arg['verbose']:
             for i in range(len(best_c1)):

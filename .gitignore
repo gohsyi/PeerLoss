@@ -107,3 +107,4 @@ venv.bak/
 .DS_Store
 uci/large/
 logs/
+.ipynb

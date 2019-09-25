@@ -8,6 +8,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 from scipy.ndimage.filters import gaussian_filter1d
 
 
@@ -48,25 +49,26 @@ def plot_(folder):
 
 
 def plot(results, labels, title=None, path=None):
-    for i, (result, label) in enumerate(zip(results, labels)):
-        mean = np.mean(result, axis=0)
-        std = np.std(result, axis=0)
-        _mean = gaussian_filter1d(mean, sigma=3)
-        _min = gaussian_filter1d(mean - std, sigma=3)
-        _max = gaussian_filter1d(mean + std, sigma=3)
-        plt.plot(_mean, label=label, color=f'C{i}')
-        plt.fill_between(range(mean.size), _min, _max, color=f'C{i}', alpha=0.3)
+    with PdfPages(f'{path}/{title.replace(" ", "_")}.pdf') as pdf:
+        for i, (result, label) in enumerate(zip(results, labels)):
+            mean = np.mean(result, axis=0)
+            std = np.std(result, axis=0)
+            _mean = gaussian_filter1d(mean, sigma=3)
+            _min = gaussian_filter1d(mean - std, sigma=3)
+            _max = gaussian_filter1d(mean + std, sigma=3)
+            plt.plot(_mean, label=label, color=f'C{i}')
+            plt.fill_between(range(mean.size), _min, _max, color=f'C{i}', alpha=0.3)
 
-    if title:
-        plt.title(title)
-    plt.xlabel('episodes')
-    plt.legend()
-    plt.grid()
-    if path:
-        plt.savefig(f'{path}/{title.replace(" ", "_")}.jpg')
-    else:
-        plt.show()
-    plt.cla()
+        if title:
+            plt.title(title)
+        plt.xlabel('episodes (x20)')
+        plt.legend()
+        plt.grid()
+        if path:
+            pdf.savefig()
+        else:
+            plt.show()
+        plt.cla()
 
 
 def plot__(results, labels, title=None):

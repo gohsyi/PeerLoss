@@ -1,11 +1,38 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.functional as F
 from sklearn.metrics import accuracy_score
 
 
+class DMILoss:
+    def __call__(self, *args, **kwargs):
+        return self.forward(*args, **kwargs)
+
+    def forward(self, output, target):
+        outputs = torch.softmax(output, dim=-1)
+        targets = target.reshape(-1, 1).type(torch.int64)
+        y_onehot = torch.zeros(target.size(0), 2)
+        y_onehot.scatter_(1, targets, 1)
+        y_onehot = y_onehot.transpose(0, 1)
+        mat = y_onehot @ outputs
+        mat = mat / target.size(0)
+        det = torch.det(mat.float())
+        if det < 0:
+            return torch.log(torch.abs(det) + 0.0001)
+        else:
+            return -torch.log(torch.abs(det) + 0.0001)
+
+
+class SigmoidLoss:
+    def __call__(self, *args, **kwargs):
+        return self.forward(*args, **kwargs)
+
+    def forward(self, y_pred, y):
+        return torch.mean(1. / (1. + torch.exp(y_pred * y)))
+
 class MLP(nn.Module):
-    def __init__(self, feature_dim, hidsizes, dropout=0., activation='relu'):
+    def __init__(self, feature_dim, hidsizes, outputs=1, dropout=0., activation='relu'):
         super(MLP, self).__init__()
 
         if activation == 'relu':
@@ -27,7 +54,7 @@ class MLP(nn.Module):
             self.mlp.append(nn.Linear(hidsizes[i-1], hidsizes[i]))
             self.mlp.append(nn.Dropout(dropout))
             self.mlp.append(self.ac_fn())
-        self.mlp = nn.Sequential(*self.mlp, nn.Linear(hidsizes[-1], 1))
+        self.mlp = nn.Sequential(*self.mlp, nn.Linear(hidsizes[-1], outputs))
 
     def forward(self, x):
         if type(x) != torch.Tensor:
@@ -72,6 +99,14 @@ class BinaryClassifier(object):
             self.transform_y = True
             self.ac_fn = torch.tanh
             self.loss_func = torch.nn.SoftMarginLoss
+        elif loss_func == 'sigmoid':
+            self.transform_y = True
+            self.ac_fn = torch.tanh
+            self.loss_func = SigmoidLoss
+        elif loss_func == 'dmi':
+            self.transform_y = False
+            self.ac_fn = torch.sigmoid
+            self.loss_func = DMILoss
         else:
             raise(NotImplementedError, loss_func)
 
@@ -129,6 +164,66 @@ class BinaryClassifier(object):
             loss = self.train(mb_X_train, mb_y_train)
             losses.append(loss)
             
+            if ep % val_interval == 0 and X_val is not None and y_val is not None:
+                train_acc.append(self.val(X_train, y_train))
+                val_acc.append(self.val(X_val, y_val))
+            if logger is not None and ep % log_interval == 0:
+                logger.record_tabular('ep', ep)
+                logger.record_tabular('loss', np.mean(losses[-log_interval:]))
+                logger.record_tabular('train_acc', np.mean(train_acc[-log_interval//val_interval:]))
+                if X_val is not None and y_val is not None:
+                    logger.record_tabular('val_acc', np.mean(val_acc[-log_interval//val_interval:]))
+                logger.dump_tabular()
+
+        return {'loss': losses, 'train_acc': train_acc, 'val_acc': val_acc}
+
+
+class DMIClassifier(object):
+    def __init__(self, model, learning_rate):
+        self.model = model
+        if torch.cuda.is_available():
+            self.model.cuda()
+
+        self.loss = DMILoss()
+        self.optimizer = torch.optim.Adam(self.model.parameters(), learning_rate)
+
+    def predict(self, X):
+        with torch.no_grad():
+            y_pred = self.model(X).cpu().numpy()
+        y_pred = y_pred.argmax(-1)
+        return y_pred
+
+    def train(self, X, y):
+        self.model.train()
+
+        y_pred = self.model(X)
+        y = torch.tensor(y, dtype=torch.float)
+
+        loss = self.loss(y_pred, y)
+        self.optimizer.zero_grad()
+        loss.backward()
+        # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
+        self.optimizer.step()
+        return loss.item()
+
+    def val(self, X, y):
+        self.model.eval()
+        y_pred = self.predict(torch.tensor(X, dtype=torch.float))
+        acc = accuracy_score(y, y_pred)
+        return acc
+
+    def fit(self, X_train, y_train, X_val=None, y_val=None, episodes=100, batchsize=None,
+            val_interval=20, log_interval=100, logger=None):
+        train_acc, val_acc, losses = [], [], []
+        batchsize = batchsize if batchsize and batchsize < len(X_train) else len(X_train)
+        m = X_train.shape[0]
+
+        for ep in range(episodes):
+            mb_idxes = np.random.choice(m, batchsize, replace=False)
+            mb_X_train, mb_y_train = X_train[mb_idxes], y_train[mb_idxes]
+            loss = self.train(mb_X_train, mb_y_train)
+            losses.append(loss)
+
             if ep % val_interval == 0 and X_val is not None and y_val is not None:
                 train_acc.append(self.val(X_train, y_train))
                 val_acc.append(self.val(X_val, y_val))

@@ -7,7 +7,7 @@ from utils.dataloader import DataLoader
 from utils.results_plotter import plot
 from utils.misc import set_global_seeds, make_arg_list
 
-from models.nn import MLP, BinaryClassifier, PeerBinaryClassifier, SurrogateBinaryClassifier
+from models.nn import MLP, BinaryClassifier, PeerBinaryClassifier, SurrogateBinaryClassifier, DMIClassifier
 
 ALPHAS = [-5, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 2.0, 3.0, 4.0, 5.0]
 
@@ -69,6 +69,7 @@ def find_best_params(kargs):
     if len(kargs['batchsize']) == 1 and len(kargs['lr']) == 1 and len(kargs['hidsize']) == 1:
         return {
             'batchsize': kargs['batchsize'][0],
+            'batchsize_peer': kargs['batchsize_peer'][0],
             'hidsize': kargs['hidsize'][0],
             'lr': kargs['lr'][0],
         }
@@ -119,6 +120,52 @@ def run_nn(args):
         model=mlp,
         learning_rate=args['lr'],
         loss_func=args['loss'],
+    )
+    results = classifier.fit(
+        X_train, y_train, X_test, y_test,
+        batchsize=args['batchsize'],
+        episodes=args['episodes'],
+        logger=logger if args['seeds'] == 1 else None,
+    )
+    return results
+
+
+def run_nn_symm(args):
+    set_global_seeds(args['seed'])
+    dataset = DataLoader(args['dataset'])
+    X_train, X_test, X_val, y_train, y_test, y_val = dataset.prepare_train_test_val(args)
+    mlp = MLP(
+        feature_dim=X_train.shape[-1],
+        hidsizes=args['hidsize'],
+        dropout=args['dropout'],
+    )
+    classifier = BinaryClassifier(
+        model=mlp,
+        learning_rate=args['lr'],
+        loss_func='sigmoid',  # symmetric loss
+    )
+    results = classifier.fit(
+        X_train, y_train, X_test, y_test,
+        batchsize=args['batchsize'],
+        episodes=args['episodes'],
+        logger=logger if args['seeds'] == 1 else None,
+    )
+    return results
+
+
+def run_nn_dmi(args):
+    set_global_seeds(args['seed'])
+    dataset = DataLoader(args['dataset'])
+    X_train, X_test, X_val, y_train, y_test, y_val = dataset.prepare_train_test_val(args)
+    mlp = MLP(
+        feature_dim=X_train.shape[-1],
+        hidsizes=args['hidsize'],
+        dropout=args['dropout'],
+        outputs=2,
+    )
+    classifier = DMIClassifier(
+        model=mlp,
+        learning_rate=args['lr'],
     )
     results = classifier.fit(
         X_train, y_train, X_test, y_test,
@@ -223,41 +270,53 @@ def run(args):
     logger.record_tabular('[PEER] alpha', nn_arg['alpha'])
     logger.dump_tabular()
 
+    nn_arg['seed'] = 1
+    run_nn_dmi(nn_arg)
+    results_dmi = pool.map(run_nn_dmi, make_arg_list(nn_arg))
     results_surr = pool.map(run_nn_surr, make_arg_list(nn_arg))
     results_nn = pool.map(run_nn, make_arg_list(nn_arg))
     results_peer = pool.map(run_nn_peer, make_arg_list(nn_arg))
+    results_symm = pool.map(run_nn_symm, make_arg_list(nn_arg))
     pool.close()
     pool.join()
 
     test_acc_bce = [res['val_acc'] for res in results_nn]
     test_acc_peer = [res['val_acc'] for res in results_peer]
     test_acc_surr = [res['val_acc'] for res in results_surr]
+    test_acc_symm = [res['val_acc'] for res in results_symm]
+    test_acc_dmi = [res['val_acc'] for res in results_dmi]
 
-    plot([test_acc_bce, test_acc_peer, test_acc_surr],
-         ['cross entropy loss', 'peer loss', 'surrogate loss'],
+    plot([test_acc_bce, test_acc_peer, test_acc_surr, test_acc_symm, test_acc_dmi],
+         ['cross entropy loss', 'peer loss', 'surrogate loss', 'symmtric loss', 'dmi loss'],
          title='Accuracy During Testing',
          path=f'logs/{args["dataset"]}/nn/{prefix}')
 
     train_acc_bce = [res['train_acc'] for res in results_nn]
     train_acc_peer = [res['train_acc'] for res in results_peer]
     train_acc_surr = [res['train_acc'] for res in results_surr]
+    train_acc_symm = [res['train_acc'] for res in results_symm]
+    train_acc_dmi = [res['train_acc'] for res in results_dmi]
 
-    plot([train_acc_bce, train_acc_peer, train_acc_surr],
-         ['cross entropy loss', 'peer loss', 'surrogate loss'],
+    plot([train_acc_bce, train_acc_peer, train_acc_surr, train_acc_symm, train_acc_dmi],
+         ['cross entropy loss', 'peer loss', 'surrogate loss', 'symmetric loss', 'dmi loss'],
          title='Accuracy During Training',
          path=f'logs/{args["dataset"]}/nn/{prefix}')
 
     loss_acc_surr = [res['loss'] for res in results_surr]
     loss_acc_bce = [res['loss'] for res in results_nn]
     loss_acc_peer = [res['loss'] for res in results_peer]
+    loss_acc_symm = [res['loss'] for res in results_symm]
+    loss_acc_dmi = [res['loss'] for res in results_dmi]
 
-    plot([loss_acc_bce, loss_acc_peer, loss_acc_surr],
-         ['cross entropy loss', 'peer loss', 'surrogate loss'],
+    plot([loss_acc_bce, loss_acc_peer, loss_acc_surr, loss_acc_symm, loss_acc_dmi],
+         ['cross entropy loss', 'peer loss', 'surrogate loss', 'symmetric loss', 'dmi loss'],
          title='Loss',
          path=f'logs/{args["dataset"]}/nn/{prefix}')
 
     logger.record_tabular('[NN] with peer loss', np.mean(test_acc_peer, 0)[-1])
     logger.record_tabular('[NN] with surrogate loss', np.mean(test_acc_surr, 0)[-1])
+    logger.record_tabular('[NN] with symmetric loss', np.mean(test_acc_symm, 0)[-1])
+    logger.record_tabular('[NN] with dmi loss', np.mean(test_acc_dmi, 0)[-1])
     logger.record_tabular(f'[NN] with {args["loss"]} loss', np.mean(test_acc_bce, 0)[-1])
     logger.dump_tabular()
 
